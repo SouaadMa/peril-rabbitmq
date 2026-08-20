@@ -31,6 +31,30 @@ func main() {
 	fmt.Println("Created a channel successfully")
 	defer channel.Close()
 
+	err = channel.ExchangeDeclare("peril_dlx", "fanout", true, false, false, false, nil)
+	if err != nil {
+		fmt.Println("Failed to declare dlx")
+		return
+	}
+
+	_, err = channel.QueueDeclare("peril_dlq", true, false, false, false, nil)
+	if err != nil {
+		fmt.Println("Failed to declare dlq")
+		return
+	}
+
+	err = channel.QueueBind("peril_dlq", "", "peril_dlx", false, nil)
+	if err != nil {
+		fmt.Println("Failed to bind dlq")
+		return
+	}
+
+	_, _, err = pubsub.DeclareAndBind(connection, routing.ExchangePerilTopic, routing.GameLogSlug, "game_logs.*", pubsub.DurableQueue)
+	if err != nil {
+		fmt.Println("Failed to declare and bind queue")
+	}
+	fmt.Println("Declared and binded queue")
+
 	gamelogic.PrintServerHelp()
 
 REPL:
