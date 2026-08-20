@@ -53,7 +53,23 @@ func main() {
 	if err != nil {
 		fmt.Println("Failed to declare and bind queue")
 	}
-	fmt.Println("Declared and binded queue")
+	fmt.Println("Declared and binded queue game_logs.*")
+
+	err = pubsub.SubscribeGob(
+		connection,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		"game_logs.*",
+		pubsub.DurableQueue,
+		func(log routing.GameLog) pubsub.AckType {
+			defer fmt.Println(">")
+			gamelogic.WriteLog(log)
+			return pubsub.Ack
+		},
+	)
+	if err != nil {
+		fmt.Println("Failed to subscribe to queue")
+	}
 
 	gamelogic.PrintServerHelp()
 

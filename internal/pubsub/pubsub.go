@@ -104,6 +104,8 @@ func SubscribeJSON[T any](
 		return err
 	}
 
+	channel.Qos(10, 0, false)
+
 	messages, err := channel.Consume(queueName, "", false, false, false, false, amqp.Table{})
 	if err != nil {
 		return err
@@ -113,6 +115,52 @@ func SubscribeJSON[T any](
 		for msg := range messages {
 			var val T
 			err := json.Unmarshal(msg.Body, &val)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			ack := handler(val)
+			switch ack {
+			case Ack:
+				fmt.Println("ack", string(msg.Body))
+				msg.Ack(false)
+			case Nack:
+				fmt.Println("nack", string(msg.Body))
+				msg.Nack(false, true)
+			case Reject:
+				fmt.Println("reject", string(msg.Body))
+				msg.Reject(false)
+			}
+		}
+	}()
+
+	return nil
+}
+
+func SubscribeGob[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType,
+	handler func(T) AckType,
+) error {
+	channel, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
+	if err != nil {
+		return err
+	}
+
+	channel.Qos(10, 0, false)
+
+	messages, err := channel.Consume(queueName, "", false, false, false, false, amqp.Table{})
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		for msg := range messages {
+			var val T
+			err := gob.NewDecoder(bytes.NewReader(msg.Body)).Decode(&val)
 			if err != nil {
 				log.Println(err)
 				continue
