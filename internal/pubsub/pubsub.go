@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -34,15 +35,17 @@ func WithDeadLetterExchange(exchange string) QueueOption {
 	}
 }
 
-func PublishJSON[T any](ch *amqp.Channel, exchange, key string, val T) error {
-	return publish(ch, exchange, key, val, "application/json", encodeJSON[T])
+func PublishJSON[T any](ctx context.Context, ch *amqp.Channel, exchange, key string, val T) error {
+	return publish(ctx, ch, exchange, key, val, "application/json", encodeJSON[T])
 }
 
-func PublishGob[T any](ch *amqp.Channel, exchange, key string, val T) error {
-	return publish(ch, exchange, key, val, "application/gob", encodeGob[T])
+func PublishGob[T any](ctx context.Context, ch *amqp.Channel, exchange, key string, val T) error {
+	return publish(ctx, ch, exchange, key, val, "application/gob", encodeGob[T])
 }
 
 func SubscribeJSON[T any](
+	ctx context.Context,
+	wg *sync.WaitGroup,
 	conn *amqp.Connection,
 	exchange, queueName, key string,
 	queueType SimpleQueueType,
@@ -50,10 +53,12 @@ func SubscribeJSON[T any](
 	handler func(T) AckType,
 	opts ...QueueOption,
 ) error {
-	return subscribe(conn, exchange, queueName, key, queueType, prefetch, decodeJSON[T], handler, opts...)
+	return subscribe(ctx, wg, conn, exchange, queueName, key, queueType, prefetch, decodeJSON[T], handler, opts...)
 }
 
 func SubscribeGob[T any](
+	ctx context.Context,
+	wg *sync.WaitGroup,
 	conn *amqp.Connection,
 	exchange, queueName, key string,
 	queueType SimpleQueueType,
@@ -61,7 +66,7 @@ func SubscribeGob[T any](
 	handler func(T) AckType,
 	opts ...QueueOption,
 ) error {
-	return subscribe(conn, exchange, queueName, key, queueType, prefetch, decodeGob[T], handler, opts...)
+	return subscribe(ctx, wg, conn, exchange, queueName, key, queueType, prefetch, decodeGob[T], handler, opts...)
 }
 
 func DeclareAndBind(
@@ -100,6 +105,7 @@ func DeclareAndBind(
 }
 
 func publish[T any](
+	ctx context.Context,
 	ch *amqp.Channel,
 	exchange, key string,
 	val T,
@@ -111,7 +117,7 @@ func publish[T any](
 		return fmt.Errorf("encode %s message: %w", contentType, err)
 	}
 
-	err = ch.PublishWithContext(context.Background(), exchange, key, false, false, amqp.Publishing{
+	err = ch.PublishWithContext(ctx, exchange, key, false, false, amqp.Publishing{
 		ContentType:  contentType,
 		DeliveryMode: amqp.Persistent,
 		Body:         body,
@@ -123,6 +129,8 @@ func publish[T any](
 }
 
 func subscribe[T any](
+	ctx context.Context,
+	wg *sync.WaitGroup,
 	conn *amqp.Connection,
 	exchange, queueName, key string,
 	queueType SimpleQueueType,
@@ -148,25 +156,34 @@ func subscribe[T any](
 		return fmt.Errorf("consume from %q: %w", queueName, err)
 	}
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		defer channel.Close()
-		for msg := range messages {
-			var val T
-			err := decode(msg.Body, &val)
-			if err != nil {
-				// Retrying will never make it decode, so drop it to the
-				// dead-letter exchange rather than requeue it.
-				log.Printf("discarding undecodable message from %s: %v", queueName, err)
-				msg.Nack(false, false)
-				continue
-			}
-			switch handler(val) {
-			case Ack:
-				msg.Ack(false)
-			case Nack:
-				msg.Nack(false, true)
-			case Reject:
-				msg.Reject(false)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-messages:
+				if !ok {
+					return
+				}
+				var val T
+				err := decode(msg.Body, &val)
+				if err != nil {
+					log.Printf("discarding undecodable message from %s: %v", queueName, err)
+					msg.Nack(false, false)
+					continue
+				}
+				switch handler(val) {
+				case Ack:
+					msg.Ack(false)
+				case Nack:
+					msg.Nack(false, true)
+				case Reject:
+					msg.Reject(false)
+				}
 			}
 		}
 	}()

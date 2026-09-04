@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
+	"sync"
+	"syscall"
 
 	"github.com/SouaadMa/peril-rabbitmq/internal/config"
 	"github.com/SouaadMa/peril-rabbitmq/internal/gamelogic"
@@ -14,35 +18,45 @@ import (
 )
 
 func main() {
+	err := run()
+	if err != nil {
+		log.Fatalf("peril server: %v", err)
+	}
+}
+
+func run() error {
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	fmt.Println("Starting Peril server...")
 
 	connection, err := amqp.Dial(cfg.AMQPURL)
 	if err != nil {
-		fmt.Println("Failed to connect")
-		return
+		return fmt.Errorf("connect to broker: %w", err)
 	}
-	fmt.Println("Connected successfully")
 	defer connection.Close()
+	fmt.Println("Connected successfully")
 
 	channel, err := connection.Channel()
 	if err != nil {
-		fmt.Println("Failed to create a channel")
+		return fmt.Errorf("open channel: %w", err)
 	}
-	fmt.Println("Created a channel successfully")
 	defer channel.Close()
 
 	err = topology.Declare(channel)
 	if err != nil {
-		fmt.Println(err)
-		return
+		return err
 	}
 
+	var wg sync.WaitGroup
 	err = pubsub.SubscribeGob(
+		ctx,
+		&wg,
 		connection,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
@@ -50,7 +64,7 @@ func main() {
 		pubsub.DurableQueue,
 		cfg.Prefetch,
 		func(gameLog routing.GameLog) pubsub.AckType {
-			defer fmt.Println(">")
+			defer fmt.Print("> ")
 			err := gamelogic.WriteLog(gameLog, cfg.WriteLogWait)
 			if err != nil {
 				fmt.Println(err)
@@ -61,39 +75,51 @@ func main() {
 		pubsub.WithDeadLetterExchange(routing.ExchangePerilDLX),
 	)
 	if err != nil {
-		fmt.Println("Failed to subscribe to queue")
+		return err
 	}
 
 	gamelogic.PrintServerHelp()
+	runREPL(ctx, channel)
 
-REPL:
+	stop()
+	wg.Wait()
+	fmt.Println("Peril server stopped")
+	return nil
+}
+
+func runREPL(ctx context.Context, ch *amqp.Channel) {
+	lines := gamelogic.InputLines(ctx)
 	for {
-		args := gamelogic.GetInput()
-		if len(args) == 0 {
-			continue
-		}
-		first := args[0]
-		switch first {
-		case "pause":
-			fmt.Println("Pausing the game")
-			pubsub.PublishJSON(channel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
-				IsPaused: true,
-			})
-		case "resume":
-			fmt.Println("Resuming the game")
-			pubsub.PublishJSON(channel, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
-				IsPaused: false,
-			})
-		case "quit":
-			fmt.Println("Quitting the game")
-			break REPL
-		default:
-			fmt.Println("Invalid command")
+		select {
+		case <-ctx.Done():
+			fmt.Println()
+			return
+		case words, ok := <-lines:
+			if !ok {
+				return
+			}
+			switch words[0] {
+			case "pause":
+				fmt.Println("Pausing the game")
+				publishPauseState(ctx, ch, true)
+			case "resume":
+				fmt.Println("Resuming the game")
+				publishPauseState(ctx, ch, false)
+			case "quit":
+				fmt.Println("Quitting the game")
+				return
+			default:
+				fmt.Println("Invalid command")
+			}
 		}
 	}
+}
 
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
-	fmt.Println("Received ctrl+c... shutting down")
+func publishPauseState(ctx context.Context, ch *amqp.Channel, paused bool) {
+	err := pubsub.PublishJSON(ctx, ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+		IsPaused: paused,
+	})
+	if err != nil {
+		fmt.Println(err)
+	}
 }
