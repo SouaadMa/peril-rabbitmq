@@ -42,18 +42,13 @@ func main() {
 		return
 	}
 
-	_, _, err = pubsub.DeclareAndBind(connection, routing.ExchangePerilTopic, routing.GameLogSlug, "game_logs.*", pubsub.DurableQueue)
-	if err != nil {
-		fmt.Println("Failed to declare and bind queue")
-	}
-	fmt.Println("Declared and binded queue game_logs.*")
-
 	err = pubsub.SubscribeGob(
 		connection,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
-		"game_logs.*",
+		routing.GameLogSlug+".*",
 		pubsub.DurableQueue,
+		cfg.Prefetch,
 		func(gameLog routing.GameLog) pubsub.AckType {
 			defer fmt.Println(">")
 			err := gamelogic.WriteLog(gameLog, cfg.WriteLogWait)
@@ -63,6 +58,7 @@ func main() {
 			}
 			return pubsub.Ack
 		},
+		pubsub.WithDeadLetterExchange(routing.ExchangePerilDLX),
 	)
 	if err != nil {
 		fmt.Println("Failed to subscribe to queue")

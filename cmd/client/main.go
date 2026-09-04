@@ -46,22 +46,24 @@ func main() {
 	pauseQueueName := routing.PauseKey + "." + username
 	gameState := gamelogic.NewGameState(username)
 
-	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilDirect, pauseQueueName, routing.PauseKey, pubsub.TransientQueue, handlerPause(gameState))
+	deadLetter := pubsub.WithDeadLetterExchange(routing.ExchangePerilDLX)
+
+	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilDirect, pauseQueueName, routing.PauseKey, pubsub.TransientQueue, cfg.Prefetch, handlerPause(gameState), deadLetter)
 	if err != nil {
-		fmt.Println("Failed to declare and bind")
+		fmt.Println(err)
 		return
 	}
 
 	armyMovesQueueName := routing.ArmyMovesPrefix + "." + username
-	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilTopic, armyMovesQueueName, routing.ArmyMovesPrefix+".*", pubsub.TransientQueue, handlerMove(gameState, channel))
+	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilTopic, armyMovesQueueName, routing.ArmyMovesPrefix+".*", pubsub.TransientQueue, cfg.Prefetch, handlerMove(gameState, channel), deadLetter)
 	if err != nil {
-		fmt.Println("Failed to declare and bind army moves queue")
+		fmt.Println(err)
 		return
 	}
 
-	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilTopic, routing.WarRecognitionsPrefix, routing.WarRecognitionsPrefix+".*", pubsub.DurableQueue, handlerWar(gameState, channel))
+	err = pubsub.SubscribeJSON(connection, routing.ExchangePerilTopic, routing.WarRecognitionsPrefix, routing.WarRecognitionsPrefix+".*", pubsub.DurableQueue, cfg.Prefetch, handlerWar(gameState, channel), deadLetter)
 	if err != nil {
-		fmt.Println("Failed to declare and bind war queue")
+		fmt.Println(err)
 		return
 	}
 
