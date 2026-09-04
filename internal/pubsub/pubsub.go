@@ -99,17 +99,25 @@ func SubscribeJSON[T any](
 	queueType SimpleQueueType,
 	handler func(T) AckType,
 ) error {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
 
 	channel, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
 		return err
 	}
 
-	channel.Qos(cfg.Prefetch, 0, false)
+	err = channel.Qos(cfg.Prefetch, 0, false)
+	if err != nil {
+		channel.Close()
+		return err
+	}
 
 	messages, err := channel.Consume(queueName, "", false, false, false, false, amqp.Table{})
 	if err != nil {
+		channel.Close()
 		return err
 	}
 
@@ -147,17 +155,25 @@ func SubscribeGob[T any](
 	queueType SimpleQueueType,
 	handler func(T) AckType,
 ) error {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
 
 	channel, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
 		return err
 	}
 
-	channel.Qos(cfg.Prefetch, 0, false)
+	err = channel.Qos(cfg.Prefetch, 0, false)
+	if err != nil {
+		channel.Close()
+		return err
+	}
 
 	messages, err := channel.Consume(queueName, "", false, false, false, false, amqp.Table{})
 	if err != nil {
+		channel.Close()
 		return err
 	}
 

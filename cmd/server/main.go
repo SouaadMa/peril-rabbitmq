@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/config"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
@@ -13,11 +14,14 @@ import (
 )
 
 func main() {
-	//TODO: Declare this in env
-	connection_string := "amqp://guest:guest@localhost:5672/"
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	fmt.Println("Starting Peril server...")
 
-	connection, err := amqp.Dial(connection_string)
+	connection, err := amqp.Dial(cfg.AMQPURL)
 	if err != nil {
 		fmt.Println("Failed to connect")
 		return
@@ -50,9 +54,13 @@ func main() {
 		routing.GameLogSlug,
 		"game_logs.*",
 		pubsub.DurableQueue,
-		func(log routing.GameLog) pubsub.AckType {
+		func(gameLog routing.GameLog) pubsub.AckType {
 			defer fmt.Println(">")
-			gamelogic.WriteLog(log)
+			err := gamelogic.WriteLog(gameLog, cfg.WriteLogWait)
+			if err != nil {
+				fmt.Println(err)
+				return pubsub.Nack
+			}
 			return pubsub.Ack
 		},
 	)

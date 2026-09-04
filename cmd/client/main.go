@@ -13,7 +13,11 @@ import (
 )
 
 func main() {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	connection_string := cfg.AMQPURL
 	fmt.Println("Starting Peril client...")
 
