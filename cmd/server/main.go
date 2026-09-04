@@ -5,11 +5,11 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/config"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/topology"
+	"github.com/SouaadMa/peril-rabbitmq/internal/config"
+	"github.com/SouaadMa/peril-rabbitmq/internal/gamelogic"
+	"github.com/SouaadMa/peril-rabbitmq/internal/pubsub"
+	"github.com/SouaadMa/peril-rabbitmq/internal/routing"
+	"github.com/SouaadMa/peril-rabbitmq/internal/topology"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 

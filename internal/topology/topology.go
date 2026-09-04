@@ -3,7 +3,7 @@ package topology
 import (
 	"fmt"
 
-	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	"github.com/SouaadMa/peril-rabbitmq/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
