@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/config"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -98,13 +99,14 @@ func SubscribeJSON[T any](
 	queueType SimpleQueueType,
 	handler func(T) AckType,
 ) error {
+	cfg := config.Load()
 
 	channel, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
 		return err
 	}
 
-	channel.Qos(10, 0, false)
+	channel.Qos(cfg.Prefetch, 0, false)
 
 	messages, err := channel.Consume(queueName, "", false, false, false, false, amqp.Table{})
 	if err != nil {
@@ -145,12 +147,14 @@ func SubscribeGob[T any](
 	queueType SimpleQueueType,
 	handler func(T) AckType,
 ) error {
+	cfg := config.Load()
+
 	channel, _, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
 		return err
 	}
 
-	channel.Qos(10, 0, false)
+	channel.Qos(cfg.Prefetch, 0, false)
 
 	messages, err := channel.Consume(queueName, "", false, false, false, false, amqp.Table{})
 	if err != nil {

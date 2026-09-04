@@ -6,14 +6,16 @@ import (
 	"os"
 	"time"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/config"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 )
 
 const logsFile = "game.log"
 
-const writeToDiskSleep = 1 * time.Second
-
 func WriteLog(gamelog routing.GameLog) error {
+	cfg := config.Load()
+	writeToDiskSleep := cfg.WriteLogWait * time.Second
+
 	log.Printf("received game log...")
 	time.Sleep(writeToDiskSleep)
 

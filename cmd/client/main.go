@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/config"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
@@ -12,8 +13,8 @@ import (
 )
 
 func main() {
-	//TODO: Declare this in env
-	connection_string := "amqp://guest:guest@localhost:5672/"
+	cfg := config.Load()
+	connection_string := cfg.AMQPURL
 	fmt.Println("Starting Peril client...")
 
 	connection, err := amqp.Dial(connection_string)
