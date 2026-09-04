@@ -8,6 +8,7 @@ import (
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/topology"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -31,21 +32,9 @@ func main() {
 	fmt.Println("Created a channel successfully")
 	defer channel.Close()
 
-	err = channel.ExchangeDeclare("peril_dlx", "fanout", true, false, false, false, nil)
+	err = topology.Declare(channel)
 	if err != nil {
-		fmt.Println("Failed to declare dlx")
-		return
-	}
-
-	_, err = channel.QueueDeclare("peril_dlq", true, false, false, false, nil)
-	if err != nil {
-		fmt.Println("Failed to declare dlq")
-		return
-	}
-
-	err = channel.QueueBind("peril_dlq", "", "peril_dlx", false, nil)
-	if err != nil {
-		fmt.Println("Failed to bind dlq")
+		fmt.Println(err)
 		return
 	}
 
