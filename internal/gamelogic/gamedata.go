@@ -32,6 +32,17 @@ type RecognitionOfWar struct {
 
 type Location string
 
+func AllLocations() []Location {
+	return []Location{
+		"americas",
+		"europe",
+		"africa",
+		"asia",
+		"australia",
+		"antarctica",
+	}
+}
+
 func getAllRanks() map[UnitRank]struct{} {
 	return map[UnitRank]struct{}{
 		RankInfantry:  {},
@@ -41,12 +52,9 @@ func getAllRanks() map[UnitRank]struct{} {
 }
 
 func getAllLocations() map[Location]struct{} {
-	return map[Location]struct{}{
-		"americas":   {},
-		"europe":     {},
-		"africa":     {},
-		"asia":       {},
-		"australia":  {},
-		"antarctica": {},
+	locations := map[Location]struct{}{}
+	for _, location := range AllLocations() {
+		locations[location] = struct{}{}
 	}
+	return locations
 }

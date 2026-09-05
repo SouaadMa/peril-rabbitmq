@@ -27,8 +27,8 @@ func ResolveWar(attacker, defender Player) (WarResult, bool) {
 		return WarResult{}, false
 	}
 
-	attackerPower := unitsToPowerLevel(unitsInLocation(attacker, location))
-	defenderPower := unitsToPowerLevel(unitsInLocation(defender, location))
+	attackerPower := PowerLevel(unitsInLocation(attacker, location))
+	defenderPower := PowerLevel(unitsInLocation(defender, location))
 
 	result := WarResult{
 		Location: location,
@@ -91,7 +91,7 @@ func unitsInLocation(p Player, loc Location) []Unit {
 	return units
 }
 
-func unitsToPowerLevel(units []Unit) int {
+func PowerLevel(units []Unit) int {
 	power := 0
 	for _, unit := range units {
 		switch unit.Rank {
