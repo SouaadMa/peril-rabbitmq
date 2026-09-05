@@ -15,6 +15,7 @@ import (
 	"github.com/SouaadMa/peril-rabbitmq/internal/gamelogic"
 	"github.com/SouaadMa/peril-rabbitmq/internal/pubsub"
 	"github.com/SouaadMa/peril-rabbitmq/internal/routing"
+	"github.com/SouaadMa/peril-rabbitmq/internal/topology"
 )
 
 func main() {
@@ -92,6 +93,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	client.Supervise(ctx, &wg, topology.Declare)
 
 	runREPL(ctx, gameState, client, username)
 

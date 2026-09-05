@@ -71,6 +71,8 @@ func run() error {
 		return err
 	}
 
+	client.Supervise(ctx, &wg, topology.Declare)
+
 	gamelogic.PrintServerHelp()
 	runREPL(ctx, client)
 

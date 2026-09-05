@@ -3,9 +3,17 @@ package pubsub
 import (
 	"context"
 	"fmt"
+	"log"
+	"math/rand"
 	"sync"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+)
+
+const (
+	minRetryDelay = time.Second
+	maxRetryDelay = 30 * time.Second
 )
 
 type starter func(context.Context, *amqp.Connection) error
@@ -27,6 +35,44 @@ func Dial(url string) (*Client, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+func (c *Client) Supervise(ctx context.Context, wg *sync.WaitGroup, redeclare func(*amqp.Channel) error) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			closed := make(chan *amqp.Error, 1)
+			c.Connection().NotifyClose(closed)
+
+			select {
+			case <-ctx.Done():
+				return
+			case amqpErr, ok := <-closed:
+				if !ok || amqpErr == nil {
+					return
+				}
+				log.Printf("broker connection lost: %v", amqpErr)
+			}
+
+			if !c.redial(ctx) {
+				return
+			}
+			log.Printf("reconnected to broker")
+
+			err := redeclare(c.Channel())
+			if err != nil {
+				log.Printf("redeclare topology: %v", err)
+				continue
+			}
+			for _, start := range c.starters() {
+				err := start(ctx, c.Connection())
+				if err != nil {
+					log.Printf("resubscribe: %v", err)
+				}
+			}
+		}
+	}()
 }
 
 func (c *Client) connect() error {
@@ -78,4 +124,27 @@ func (c *Client) starters() []starter {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return append([]starter(nil), c.subs...)
+}
+
+func (c *Client) redial(ctx context.Context) bool {
+	delay := minRetryDelay
+	for {
+		jitter := time.Duration(rand.Int63n(int64(delay / 2)))
+		select {
+		case <-ctx.Done():
+			return false
+		case <-time.After(delay + jitter):
+		}
+
+		err := c.connect()
+		if err == nil {
+			return true
+		}
+		log.Printf("reconnect failed: %v", err)
+
+		delay *= 2
+		if delay > maxRetryDelay {
+			delay = maxRetryDelay
+		}
+	}
 }
