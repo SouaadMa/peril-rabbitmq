@@ -46,27 +46,27 @@ func PublishGob[T any](ctx context.Context, c *Client, exchange, key string, val
 func SubscribeJSON[T any](
 	ctx context.Context,
 	wg *sync.WaitGroup,
-	conn *amqp.Connection,
+	c *Client,
 	exchange, queueName, key string,
 	queueType SimpleQueueType,
 	prefetch int,
 	handler func(T) AckType,
 	opts ...QueueOption,
 ) error {
-	return subscribe(ctx, wg, conn, exchange, queueName, key, queueType, prefetch, decodeJSON[T], handler, opts...)
+	return subscribe(ctx, wg, c, exchange, queueName, key, queueType, prefetch, decodeJSON[T], handler, opts...)
 }
 
 func SubscribeGob[T any](
 	ctx context.Context,
 	wg *sync.WaitGroup,
-	conn *amqp.Connection,
+	c *Client,
 	exchange, queueName, key string,
 	queueType SimpleQueueType,
 	prefetch int,
 	handler func(T) AckType,
 	opts ...QueueOption,
 ) error {
-	return subscribe(ctx, wg, conn, exchange, queueName, key, queueType, prefetch, decodeGob[T], handler, opts...)
+	return subscribe(ctx, wg, c, exchange, queueName, key, queueType, prefetch, decodeGob[T], handler, opts...)
 }
 
 func DeclareAndBind(
@@ -128,7 +128,7 @@ func publish[T any](
 	return nil
 }
 
-func subscribe[T any](
+func startConsumer[T any](
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	conn *amqp.Connection,
@@ -189,6 +189,24 @@ func subscribe[T any](
 	}()
 
 	return nil
+}
+
+func subscribe[T any](
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	c *Client,
+	exchange, queueName, key string,
+	queueType SimpleQueueType,
+	prefetch int,
+	decode func([]byte, *T) error,
+	handler func(T) AckType,
+	opts ...QueueOption,
+) error {
+	start := func(ctx context.Context, conn *amqp.Connection) error {
+		return startConsumer(ctx, wg, conn, exchange, queueName, key, queueType, prefetch, decode, handler, opts...)
+	}
+	c.register(start)
+	return start(ctx, c.Connection())
 }
 
 func encodeJSON[T any](val T) ([]byte, error) {

@@ -50,7 +50,7 @@ func run() error {
 	err = pubsub.SubscribeGob(
 		ctx,
 		&wg,
-		client.Connection(),
+		client,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",

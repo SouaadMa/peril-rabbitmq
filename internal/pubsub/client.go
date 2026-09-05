@@ -1,11 +1,14 @@
 package pubsub
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
+
+type starter func(context.Context, *amqp.Connection) error
 
 type Client struct {
 	url string
@@ -13,6 +16,8 @@ type Client struct {
 	mu    sync.RWMutex
 	conn  *amqp.Connection
 	pubCh *amqp.Channel
+
+	subs []starter
 }
 
 func Dial(url string) (*Client, error) {
@@ -61,4 +66,16 @@ func (c *Client) Close() error {
 		return nil
 	}
 	return c.conn.Close()
+}
+
+func (c *Client) register(s starter) {
+	c.mu.Lock()
+	c.subs = append(c.subs, s)
+	c.mu.Unlock()
+}
+
+func (c *Client) starters() []starter {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return append([]starter(nil), c.subs...)
 }

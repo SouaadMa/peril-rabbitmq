@@ -52,7 +52,7 @@ func run() error {
 	var wg sync.WaitGroup
 
 	err = pubsub.SubscribeJSON(
-		ctx, &wg, client.Connection(),
+		ctx, &wg, client,
 		routing.ExchangePerilDirect,
 		routing.PauseKey+"."+username,
 		routing.PauseKey,
@@ -66,7 +66,7 @@ func run() error {
 	}
 
 	err = pubsub.SubscribeJSON(
-		ctx, &wg, client.Connection(),
+		ctx, &wg, client,
 		routing.ExchangePerilTopic,
 		routing.ArmyMovesPrefix+"."+username,
 		routing.ArmyMovesPrefix+".*",
@@ -80,7 +80,7 @@ func run() error {
 	}
 
 	err = pubsub.SubscribeJSON(
-		ctx, &wg, client.Connection(),
+		ctx, &wg, client,
 		routing.ExchangePerilTopic,
 		routing.WarRecognitionsPrefix,
 		routing.WarRecognitionsPrefix+".*",
