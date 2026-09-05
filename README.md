@@ -34,13 +34,14 @@ http://localhost:15672 (guest/guest).
 
 ## How the messaging fits together
 
-| Exchange       | Type   | Routing key         | Queue                           | Who consumes                    |
-| -------------- | ------ | ------------------- | ------------------------------- | ------------------------------- |
-| `peril_direct` | direct | `pause`             | `pause.<user>` (transient)      | every client                    |
-| `peril_topic`  | topic  | `army_moves.<user>` | `army_moves.<user>` (transient) | every client                    |
-| `peril_topic`  | topic  | `war.<user>`        | `war` (durable, shared)         | one client, competing consumers |
-| `peril_topic`  | topic  | `game_logs.<user>`  | `game_logs` (durable)           | the server                      |
-| `peril_dlx`    | fanout | —                   | `peril_dlq` (durable)           | nobody, it's for inspection     |
+| Exchange       | Type   | Routing key           | Queue                           | Who consumes                |
+| -------------- | ------ | --------------------- | ------------------------------- | --------------------------- |
+| `peril_direct` | direct | `pause`               | `pause.<user>` (transient)      | every client                |
+| `peril_topic`  | topic  | `army_moves.<user>`   | `army_moves.<user>` (transient) | every client                |
+| `peril_topic`  | topic  | `war.<user>`          | `war.<user>` (transient)        | every client                |
+| `peril_topic`  | topic  | `player_state.<user>` | —                               | the gateway, eventually     |
+| `peril_topic`  | topic  | `game_logs.<user>`    | `game_logs` (durable)           | the server                  |
+| `peril_dlx`    | fanout | —                     | `peril_dlq` (durable)           | nobody, it's for inspection |
 
 ## Credit
 

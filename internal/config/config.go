@@ -10,24 +10,29 @@ import (
 	"time"
 )
 
-const defaultPrefetch = 10
+const (
+	defaultPrefetch  = 10
+	defaultHeartbeat = 5 * time.Second
+)
 
 type Config struct {
-	AMQPURL      string
-	MgmtURL      string
-	ConsoleURL   string
-	Prefetch     int
-	WriteLogWait time.Duration
+	AMQPURL           string
+	MgmtURL           string
+	ConsoleURL        string
+	Prefetch          int
+	WriteLogWait      time.Duration
+	HeartbeatInterval time.Duration
 }
 
 func Load() (Config, error) {
 	loadDotEnv(".env")
 
 	cfg := Config{
-		AMQPURL:    os.Getenv("AMQP_URL"),
-		MgmtURL:    os.Getenv("RABBIT_MGMT_URL"),
-		ConsoleURL: os.Getenv("CONSOLE_URL"),
-		Prefetch:   defaultPrefetch,
+		AMQPURL:           os.Getenv("AMQP_URL"),
+		MgmtURL:           os.Getenv("RABBIT_MGMT_URL"),
+		ConsoleURL:        os.Getenv("CONSOLE_URL"),
+		Prefetch:          defaultPrefetch,
+		HeartbeatInterval: defaultHeartbeat,
 	}
 
 	if cfg.AMQPURL == "" {
@@ -51,6 +56,17 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("WRITE_LOG_WAIT_SECONDS %q is not a number: %w", raw, err)
 		}
 		cfg.WriteLogWait = time.Duration(seconds) * time.Second
+	}
+
+	if raw := os.Getenv("HEARTBEAT_SECONDS"); raw != "" {
+		seconds, err := strconv.Atoi(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("HEARTBEAT_SECONDS %q is not a number: %w", raw, err)
+		}
+		if seconds <= 0 {
+			return Config{}, fmt.Errorf("HEARTBEAT_SECONDS must be positive, got %d", seconds)
+		}
+		cfg.HeartbeatInterval = time.Duration(seconds) * time.Second
 	}
 
 	return cfg, nil

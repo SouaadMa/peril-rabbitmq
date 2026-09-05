@@ -83,9 +83,9 @@ func run() error {
 	err = pubsub.SubscribeJSON(
 		ctx, &wg, client,
 		routing.ExchangePerilTopic,
-		routing.WarRecognitionsPrefix,
+		routing.WarRecognitionsPrefix+"."+username,
 		routing.WarRecognitionsPrefix+".*",
-		pubsub.DurableQueue,
+		pubsub.TransientQueue,
 		cfg.Prefetch,
 		handlerWar(ctx, gameState, client),
 		deadLetter,
@@ -95,12 +95,40 @@ func run() error {
 	}
 
 	client.Supervise(ctx, &wg, topology.Declare)
+	publishHeartbeats(ctx, &wg, gameState, client, cfg.HeartbeatInterval)
 
 	runREPL(ctx, gameState, client, username)
 
 	stop()
 	wg.Wait()
 	return nil
+}
+
+func publishHeartbeats(ctx context.Context, wg *sync.WaitGroup, gs *gamelogic.GameState, c *pubsub.Client, interval time.Duration) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		key := routing.PlayerStatePrefix + "." + gs.GetUsername()
+		publish := func() {
+			err := pubsub.PublishJSON(ctx, c, routing.ExchangePerilTopic, key, gs.GetPlayerSnap())
+			if err != nil {
+				log.Printf("publish player state: %v", err)
+			}
+		}
+		publish()
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				publish()
+			}
+		}
+	}()
 }
 
 func runREPL(ctx context.Context, gs *gamelogic.GameState, c *pubsub.Client, username string) {
@@ -214,25 +242,21 @@ func handlerWar(ctx context.Context, gs *gamelogic.GameState, c *pubsub.Client) 
 		outcome, winner, loser := gs.HandleWar(r)
 		switch outcome {
 		case gamelogic.WarOutcomeNotInvolved:
-			return pubsub.Nack
+			return pubsub.Ack
 		case gamelogic.WarOutcomeNoUnits:
 			return pubsub.Reject
-		case gamelogic.WarOutcomeOpponentWon, gamelogic.WarOutcomeYouWon:
-			err := publishGameLog(ctx, c, routing.GameLog{
-				CurrentTime: time.Now(),
-				Username:    gs.GetUsername(),
-				Message:     fmt.Sprintf("%s won a war against %s", winner, loser),
-			})
-			if err != nil {
-				fmt.Println(err)
-				return pubsub.Nack
+		case gamelogic.WarOutcomeYouWon, gamelogic.WarOutcomeOpponentWon, gamelogic.WarOutcomeDraw:
+			if gs.GetUsername() != r.Attacker.Username {
+				return pubsub.Ack
 			}
-			return pubsub.Ack
-		case gamelogic.WarOutcomeDraw:
+			message := fmt.Sprintf("%s won a war against %s", winner, loser)
+			if outcome == gamelogic.WarOutcomeDraw {
+				message = fmt.Sprintf("The war between %s and %s resulted in a draw", winner, loser)
+			}
 			err := publishGameLog(ctx, c, routing.GameLog{
 				CurrentTime: time.Now(),
 				Username:    gs.GetUsername(),
-				Message:     fmt.Sprintf("The war between %s and %s resulted in a draw", winner, loser),
+				Message:     message,
 			})
 			if err != nil {
 				fmt.Println(err)
