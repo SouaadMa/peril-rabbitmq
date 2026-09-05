@@ -14,7 +14,6 @@ import (
 	"github.com/SouaadMa/peril-rabbitmq/internal/pubsub"
 	"github.com/SouaadMa/peril-rabbitmq/internal/routing"
 	"github.com/SouaadMa/peril-rabbitmq/internal/topology"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
@@ -35,20 +34,14 @@ func run() error {
 
 	fmt.Println("Starting Peril server...")
 
-	connection, err := amqp.Dial(cfg.AMQPURL)
+	client, err := pubsub.Dial(cfg.AMQPURL)
 	if err != nil {
 		return fmt.Errorf("connect to broker: %w", err)
 	}
-	defer connection.Close()
+	defer client.Close()
 	fmt.Println("Connected successfully")
 
-	channel, err := connection.Channel()
-	if err != nil {
-		return fmt.Errorf("open channel: %w", err)
-	}
-	defer channel.Close()
-
-	err = topology.Declare(channel)
+	err = topology.Declare(client.Channel())
 	if err != nil {
 		return err
 	}
@@ -57,7 +50,7 @@ func run() error {
 	err = pubsub.SubscribeGob(
 		ctx,
 		&wg,
-		connection,
+		client.Connection(),
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		routing.GameLogSlug+".*",
@@ -79,7 +72,7 @@ func run() error {
 	}
 
 	gamelogic.PrintServerHelp()
-	runREPL(ctx, channel)
+	runREPL(ctx, client)
 
 	stop()
 	wg.Wait()
@@ -87,7 +80,7 @@ func run() error {
 	return nil
 }
 
-func runREPL(ctx context.Context, ch *amqp.Channel) {
+func runREPL(ctx context.Context, c *pubsub.Client) {
 	lines := gamelogic.InputLines(ctx)
 	for {
 		select {
@@ -101,10 +94,10 @@ func runREPL(ctx context.Context, ch *amqp.Channel) {
 			switch words[0] {
 			case "pause":
 				fmt.Println("Pausing the game")
-				publishPauseState(ctx, ch, true)
+				publishPauseState(ctx, c, true)
 			case "resume":
 				fmt.Println("Resuming the game")
-				publishPauseState(ctx, ch, false)
+				publishPauseState(ctx, c, false)
 			case "quit":
 				fmt.Println("Quitting the game")
 				return
@@ -115,8 +108,8 @@ func runREPL(ctx context.Context, ch *amqp.Channel) {
 	}
 }
 
-func publishPauseState(ctx context.Context, ch *amqp.Channel, paused bool) {
-	err := pubsub.PublishJSON(ctx, ch, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
+func publishPauseState(ctx context.Context, c *pubsub.Client, paused bool) {
+	err := pubsub.PublishJSON(ctx, c, routing.ExchangePerilDirect, routing.PauseKey, routing.PlayingState{
 		IsPaused: paused,
 	})
 	if err != nil {

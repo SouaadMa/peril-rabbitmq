@@ -35,12 +35,12 @@ func WithDeadLetterExchange(exchange string) QueueOption {
 	}
 }
 
-func PublishJSON[T any](ctx context.Context, ch *amqp.Channel, exchange, key string, val T) error {
-	return publish(ctx, ch, exchange, key, val, "application/json", encodeJSON[T])
+func PublishJSON[T any](ctx context.Context, c *Client, exchange, key string, val T) error {
+	return publish(ctx, c.Channel(), exchange, key, val, "application/json", encodeJSON[T])
 }
 
-func PublishGob[T any](ctx context.Context, ch *amqp.Channel, exchange, key string, val T) error {
-	return publish(ctx, ch, exchange, key, val, "application/gob", encodeGob[T])
+func PublishGob[T any](ctx context.Context, c *Client, exchange, key string, val T) error {
+	return publish(ctx, c.Channel(), exchange, key, val, "application/gob", encodeGob[T])
 }
 
 func SubscribeJSON[T any](

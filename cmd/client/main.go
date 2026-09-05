@@ -15,7 +15,6 @@ import (
 	"github.com/SouaadMa/peril-rabbitmq/internal/gamelogic"
 	"github.com/SouaadMa/peril-rabbitmq/internal/pubsub"
 	"github.com/SouaadMa/peril-rabbitmq/internal/routing"
-	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
@@ -36,11 +35,11 @@ func run() error {
 
 	fmt.Println("Starting Peril client...")
 
-	connection, err := amqp.Dial(cfg.AMQPURL)
+	client, err := pubsub.Dial(cfg.AMQPURL)
 	if err != nil {
 		return fmt.Errorf("connect to broker: %w", err)
 	}
-	defer connection.Close()
+	defer client.Close()
 	fmt.Println("Connected successfully")
 
 	username, err := gamelogic.ClientWelcome()
@@ -48,18 +47,12 @@ func run() error {
 		return err
 	}
 
-	channel, err := connection.Channel()
-	if err != nil {
-		return fmt.Errorf("open channel: %w", err)
-	}
-	defer channel.Close()
-
 	gameState := gamelogic.NewGameState(username)
 	deadLetter := pubsub.WithDeadLetterExchange(routing.ExchangePerilDLX)
 	var wg sync.WaitGroup
 
 	err = pubsub.SubscribeJSON(
-		ctx, &wg, connection,
+		ctx, &wg, client.Connection(),
 		routing.ExchangePerilDirect,
 		routing.PauseKey+"."+username,
 		routing.PauseKey,
@@ -73,13 +66,13 @@ func run() error {
 	}
 
 	err = pubsub.SubscribeJSON(
-		ctx, &wg, connection,
+		ctx, &wg, client.Connection(),
 		routing.ExchangePerilTopic,
 		routing.ArmyMovesPrefix+"."+username,
 		routing.ArmyMovesPrefix+".*",
 		pubsub.TransientQueue,
 		cfg.Prefetch,
-		handlerMove(ctx, gameState, channel),
+		handlerMove(ctx, gameState, client),
 		deadLetter,
 	)
 	if err != nil {
@@ -87,27 +80,27 @@ func run() error {
 	}
 
 	err = pubsub.SubscribeJSON(
-		ctx, &wg, connection,
+		ctx, &wg, client.Connection(),
 		routing.ExchangePerilTopic,
 		routing.WarRecognitionsPrefix,
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.DurableQueue,
 		cfg.Prefetch,
-		handlerWar(ctx, gameState, channel),
+		handlerWar(ctx, gameState, client),
 		deadLetter,
 	)
 	if err != nil {
 		return err
 	}
 
-	runREPL(ctx, gameState, channel, username)
+	runREPL(ctx, gameState, client, username)
 
 	stop()
 	wg.Wait()
 	return nil
 }
 
-func runREPL(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel, username string) {
+func runREPL(ctx context.Context, gs *gamelogic.GameState, c *pubsub.Client, username string) {
 	lines := gamelogic.InputLines(ctx)
 	for {
 		select {
@@ -125,11 +118,11 @@ func runREPL(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel, use
 					fmt.Println(err)
 				}
 			case "move":
-				commandMove(ctx, gs, ch, words, username)
+				commandMove(ctx, gs, c, words, username)
 			case "status":
 				gs.CommandStatus()
 			case "spam":
-				commandSpam(ctx, ch, words, username)
+				commandSpam(ctx, c, words, username)
 			case "help":
 				gamelogic.PrintClientHelp()
 			case "quit":
@@ -142,13 +135,13 @@ func runREPL(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel, use
 	}
 }
 
-func commandMove(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel, words []string, username string) {
+func commandMove(ctx context.Context, gs *gamelogic.GameState, c *pubsub.Client, words []string, username string) {
 	move, err := gs.CommandMove(words)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	err = pubsub.PublishJSON(ctx, ch, routing.ExchangePerilTopic, routing.ArmyMovesPrefix+"."+username, move)
+	err = pubsub.PublishJSON(ctx, c, routing.ExchangePerilTopic, routing.ArmyMovesPrefix+"."+username, move)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -156,7 +149,7 @@ func commandMove(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel,
 	fmt.Println("Published move event")
 }
 
-func commandSpam(ctx context.Context, ch *amqp.Channel, words []string, username string) {
+func commandSpam(ctx context.Context, c *pubsub.Client, words []string, username string) {
 	if len(words) < 2 {
 		fmt.Println("usage: spam <n>")
 		return
@@ -167,7 +160,7 @@ func commandSpam(ctx context.Context, ch *amqp.Channel, words []string, username
 		return
 	}
 	for range n {
-		err := publishGameLog(ctx, ch, routing.GameLog{
+		err := publishGameLog(ctx, c, routing.GameLog{
 			CurrentTime: time.Now(),
 			Message:     gamelogic.GetMaliciousLog(),
 			Username:    username,
@@ -188,14 +181,14 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) pubsub.Ack
 	}
 }
 
-func handlerMove(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.ArmyMove) pubsub.AckType {
+func handlerMove(ctx context.Context, gs *gamelogic.GameState, c *pubsub.Client) func(gamelogic.ArmyMove) pubsub.AckType {
 	return func(am gamelogic.ArmyMove) pubsub.AckType {
 		defer fmt.Print("> ")
 		switch gs.HandleMove(am) {
 		case gamelogic.MoveOutComeSafe:
 			return pubsub.Ack
 		case gamelogic.MoveOutcomeMakeWar:
-			err := pubsub.PublishJSON(ctx, ch, routing.ExchangePerilTopic, routing.WarRecognitionsPrefix+"."+gs.GetUsername(), gamelogic.RecognitionOfWar{
+			err := pubsub.PublishJSON(ctx, c, routing.ExchangePerilTopic, routing.WarRecognitionsPrefix+"."+gs.GetUsername(), gamelogic.RecognitionOfWar{
 				Attacker: am.Player,
 				Defender: gs.GetPlayerSnap(),
 			})
@@ -212,7 +205,7 @@ func handlerMove(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel)
 	}
 }
 
-func handlerWar(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel) func(gamelogic.RecognitionOfWar) pubsub.AckType {
+func handlerWar(ctx context.Context, gs *gamelogic.GameState, c *pubsub.Client) func(gamelogic.RecognitionOfWar) pubsub.AckType {
 	return func(r gamelogic.RecognitionOfWar) pubsub.AckType {
 		defer fmt.Print("> ")
 		outcome, winner, loser := gs.HandleWar(r)
@@ -222,7 +215,7 @@ func handlerWar(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel) 
 		case gamelogic.WarOutcomeNoUnits:
 			return pubsub.Reject
 		case gamelogic.WarOutcomeOpponentWon, gamelogic.WarOutcomeYouWon:
-			err := publishGameLog(ctx, ch, routing.GameLog{
+			err := publishGameLog(ctx, c, routing.GameLog{
 				CurrentTime: time.Now(),
 				Username:    gs.GetUsername(),
 				Message:     fmt.Sprintf("%s won a war against %s", winner, loser),
@@ -233,7 +226,7 @@ func handlerWar(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel) 
 			}
 			return pubsub.Ack
 		case gamelogic.WarOutcomeDraw:
-			err := publishGameLog(ctx, ch, routing.GameLog{
+			err := publishGameLog(ctx, c, routing.GameLog{
 				CurrentTime: time.Now(),
 				Username:    gs.GetUsername(),
 				Message:     fmt.Sprintf("The war between %s and %s resulted in a draw", winner, loser),
@@ -249,6 +242,6 @@ func handlerWar(ctx context.Context, gs *gamelogic.GameState, ch *amqp.Channel) 
 	}
 }
 
-func publishGameLog(ctx context.Context, ch *amqp.Channel, gl routing.GameLog) error {
-	return pubsub.PublishGob(ctx, ch, routing.ExchangePerilTopic, routing.GameLogSlug+"."+gl.Username, gl)
+func publishGameLog(ctx context.Context, c *pubsub.Client, gl routing.GameLog) error {
+	return pubsub.PublishGob(ctx, c, routing.ExchangePerilTopic, routing.GameLogSlug+"."+gl.Username, gl)
 }
