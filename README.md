@@ -39,9 +39,31 @@ http://localhost:15672 (guest/guest).
 | `peril_direct` | direct | `pause`               | `pause.<user>` (transient)      | every client                |
 | `peril_topic`  | topic  | `army_moves.<user>`   | `army_moves.<user>` (transient) | every client                |
 | `peril_topic`  | topic  | `war.<user>`          | `war.<user>` (transient)        | every client                |
-| `peril_topic`  | topic  | `player_state.<user>` | —                               | the gateway, eventually     |
 | `peril_topic`  | topic  | `game_logs.<user>`    | `game_logs` (durable)           | the server                  |
+| `peril_topic`  | topic  | `army_moves.*`        | `gateway_moves` (transient)     | the gateway                 |
+| `peril_topic`  | topic  | `war.*`               | `gateway_wars` (transient)      | the gateway                 |
+| `peril_topic`  | topic  | `player_state.<user>` | `gateway_state` (transient)     | the gateway                 |
+| `peril_topic`  | topic  | `game_logs.*`         | `gateway_logs` (transient)      | the gateway                 |
 | `peril_dlx`    | fanout | —                     | `peril_dlq` (durable)           | nobody, it's for inspection |
+
+The gateway declares its own queues rather than sharing the players'. A topic
+exchange copies each message into every queue whose binding matches, so the
+gateway observes the whole game without taking a single message away from it.
+
+## The gateway
+
+`cmd/gateway` rebuilds the state of the world from those four streams and serves
+it as JSON. Nothing publishes the board — it's a projection, reconstructed purely
+from the events players emit.
+
+```sh
+go run ./cmd/gateway
+curl -s localhost:8080/api/state | jq
+```
+
+Players heartbeat their whole army every few seconds, so the gateway can be
+restarted at any point and refills within one interval. A player who stops
+heartbeating is dropped after `PLAYER_TTL_SECONDS`.
 
 ## Credit
 

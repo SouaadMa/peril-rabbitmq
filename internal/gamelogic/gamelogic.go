@@ -46,16 +46,14 @@ func PrintServerHelp() {
 	fmt.Println("* help")
 }
 
+var inputScanner = bufio.NewScanner(os.Stdin)
+
 func GetInput() []string {
 	fmt.Print("> ")
-	scanner := bufio.NewScanner(os.Stdin)
-	scanned := scanner.Scan()
-	if !scanned {
+	if !inputScanner.Scan() {
 		return nil
 	}
-	line := scanner.Text()
-	line = strings.TrimSpace(line)
-	return strings.Fields(line)
+	return strings.Fields(strings.TrimSpace(inputScanner.Text()))
 }
 
 func GetMaliciousLog() string {

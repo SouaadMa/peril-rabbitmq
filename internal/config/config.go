@@ -11,8 +11,11 @@ import (
 )
 
 const (
-	defaultPrefetch  = 10
-	defaultHeartbeat = 5 * time.Second
+	defaultPrefetch    = 10
+	defaultHeartbeat   = 5 * time.Second
+	defaultGatewayAddr = ":8080"
+	defaultPlayerTTL   = 15 * time.Second
+	defaultLogLimit    = 100
 )
 
 type Config struct {
@@ -22,6 +25,9 @@ type Config struct {
 	Prefetch          int
 	WriteLogWait      time.Duration
 	HeartbeatInterval time.Duration
+	GatewayAddr       string
+	PlayerTTL         time.Duration
+	LogLimit          int
 }
 
 func Load() (Config, error) {
@@ -33,6 +39,9 @@ func Load() (Config, error) {
 		ConsoleURL:        os.Getenv("CONSOLE_URL"),
 		Prefetch:          defaultPrefetch,
 		HeartbeatInterval: defaultHeartbeat,
+		GatewayAddr:       defaultGatewayAddr,
+		PlayerTTL:         defaultPlayerTTL,
+		LogLimit:          defaultLogLimit,
 	}
 
 	if cfg.AMQPURL == "" {
@@ -67,6 +76,32 @@ func Load() (Config, error) {
 			return Config{}, fmt.Errorf("HEARTBEAT_SECONDS must be positive, got %d", seconds)
 		}
 		cfg.HeartbeatInterval = time.Duration(seconds) * time.Second
+	}
+
+	if raw := os.Getenv("GATEWAY_ADDR"); raw != "" {
+		cfg.GatewayAddr = raw
+	}
+
+	if raw := os.Getenv("LOG_LIMIT"); raw != "" {
+		limit, err := strconv.Atoi(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("LOG_LIMIT %q is not a number: %w", raw, err)
+		}
+		if limit <= 0 {
+			return Config{}, fmt.Errorf("LOG_LIMIT must be positive, got %d", limit)
+		}
+		cfg.LogLimit = limit
+	}
+
+	if raw := os.Getenv("PLAYER_TTL_SECONDS"); raw != "" {
+		seconds, err := strconv.Atoi(raw)
+		if err != nil {
+			return Config{}, fmt.Errorf("PLAYER_TTL_SECONDS %q is not a number: %w", raw, err)
+		}
+		if seconds <= 0 {
+			return Config{}, fmt.Errorf("PLAYER_TTL_SECONDS must be positive, got %d", seconds)
+		}
+		cfg.PlayerTTL = time.Duration(seconds) * time.Second
 	}
 
 	return cfg, nil
