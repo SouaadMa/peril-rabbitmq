@@ -1,0 +1,109 @@
+.map {
+    width: 100%;
+    height: auto;
+    background: #f4f3ef;
+    border-radius: 12px;
+}
+.map text {
+    text-anchor: middle;
+    pointer-events: none;
+}
+.region text {
+    fill: #52514e;
+}
+.region.filled text {
+    fill: #ffffff;
+}
+.region-name {
+    font-size: 15px;
+    font-weight: 600;
+}
+.region-occupant {
+    font-size: 12px;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    color: #0b0b0b;
+}
+.app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+}
+header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+h1 {
+    font-size: 20px;
+    margin: 0;
+}
+main {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 24px;
+    margin-top: 16px;
+}
+
+.pill {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid currentColor;
+}
+.pill.live {
+    color: #1baf7a;
+}
+.pill.down {
+    color: #eb6834;
+}
+
+aside h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #52514e;
+    margin: 16px 0 8px;
+}
+.players,
+.log {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.players li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 14px;
+}
+.swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+.count {
+    margin-left: auto;
+    color: #52514e;
+    font-size: 12px;
+}
+.log li {
+    display: flex;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 13px;
+    border-bottom: 1px solid #e7e6e2;
+}
+.log time {
+    color: #8a8984;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+.empty {
+    color: #8a8984;
+    font-size: 14px;
+}

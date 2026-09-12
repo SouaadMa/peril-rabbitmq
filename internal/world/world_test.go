@@ -64,6 +64,14 @@ func TestApplyPlayerStateReplacesArmyWholesale(t *testing.T) {
 	}
 }
 
+func TestLogOnFreshWorld(t *testing.T) {
+	w := New(10)
+	snapshot := w.Snapshot()
+	if len(snapshot.Log) != 0 {
+		t.Errorf("log = %v, want empty", snapshot.Log)
+	}
+}
+
 func TestApplyMoveUpdatesPosition(t *testing.T) {
 	w := New(10)
 	w.ApplyPlayerState(player("alice", unit(gamelogic.RankInfantry, "europe")), t0)

@@ -46,10 +46,13 @@ func (w *World) Snapshot() Snapshot {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
+	log := make([]LogEntry, 0, len(w.log))
+	log = append(log, w.log...)
+
 	return Snapshot{
 		Players:   w.playerViews(),
 		Locations: w.locationViews(),
-		Log:       append([]LogEntry(nil), w.log...),
+		Log:       log,
 	}
 }
 
