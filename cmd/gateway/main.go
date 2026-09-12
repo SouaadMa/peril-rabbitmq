@@ -46,17 +46,20 @@ func run() error {
 	}
 
 	w := world.New(cfg.LogLimit)
+	hub := gateway.NewHub(w)
 	var wg sync.WaitGroup
 
-	err = subscribe(ctx, &wg, client, w, cfg.Prefetch)
+	hub.Run(ctx, &wg)
+
+	err = subscribe(ctx, &wg, client, w, hub, cfg.Prefetch)
 	if err != nil {
 		return err
 	}
 
 	client.Supervise(ctx, &wg, topology.Declare)
-	dropStale(ctx, &wg, w, cfg.PlayerTTL)
+	dropStale(ctx, &wg, w, hub, cfg.PlayerTTL)
 
-	err = gateway.Serve(ctx, &wg, w, cfg.GatewayAddr)
+	err = gateway.Serve(ctx, &wg, w, hub, cfg.GatewayAddr)
 	if err != nil {
 		return err
 	}
@@ -67,7 +70,7 @@ func run() error {
 	return nil
 }
 
-func subscribe(ctx context.Context, wg *sync.WaitGroup, c *pubsub.Client, w *world.World, prefetch int) error {
+func subscribe(ctx context.Context, wg *sync.WaitGroup, c *pubsub.Client, w *world.World, hub *gateway.Hub, prefetch int) error {
 	deadLetter := pubsub.WithDeadLetterExchange(routing.ExchangePerilDLX)
 
 	err := pubsub.SubscribeJSON(
@@ -79,6 +82,7 @@ func subscribe(ctx context.Context, wg *sync.WaitGroup, c *pubsub.Client, w *wor
 		prefetch,
 		func(p gamelogic.Player) pubsub.AckType {
 			w.ApplyPlayerState(p, time.Now())
+			hub.Notify()
 			return pubsub.Ack
 		},
 		deadLetter,
@@ -96,6 +100,7 @@ func subscribe(ctx context.Context, wg *sync.WaitGroup, c *pubsub.Client, w *wor
 		prefetch,
 		func(m gamelogic.ArmyMove) pubsub.AckType {
 			w.ApplyMove(m, time.Now())
+			hub.Notify()
 			return pubsub.Ack
 		},
 		deadLetter,
@@ -116,6 +121,7 @@ func subscribe(ctx context.Context, wg *sync.WaitGroup, c *pubsub.Client, w *wor
 			if fought {
 				log.Printf("war in %s: %s beat %s", result.Location, result.Winner, result.Loser)
 			}
+			hub.Notify()
 			return pubsub.Ack
 		},
 		deadLetter,
@@ -137,13 +143,14 @@ func subscribe(ctx context.Context, wg *sync.WaitGroup, c *pubsub.Client, w *wor
 				Username: gl.Username,
 				Message:  gl.Message,
 			})
+			hub.Notify()
 			return pubsub.Ack
 		},
 		deadLetter,
 	)
 }
 
-func dropStale(ctx context.Context, wg *sync.WaitGroup, w *world.World, ttl time.Duration) {
+func dropStale(ctx context.Context, wg *sync.WaitGroup, w *world.World, hub *gateway.Hub, ttl time.Duration) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -156,8 +163,12 @@ func dropStale(ctx context.Context, wg *sync.WaitGroup, w *world.World, ttl time
 			case <-ctx.Done():
 				return
 			case now := <-ticker.C:
-				for _, username := range w.DropStale(now, ttl) {
+				dropped := w.DropStale(now, ttl)
+				for _, username := range dropped {
 					log.Printf("player %s went quiet", username)
+				}
+				if len(dropped) > 0 {
+					hub.Notify()
 				}
 			}
 		}

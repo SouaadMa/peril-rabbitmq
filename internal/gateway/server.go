@@ -16,7 +16,7 @@ import (
 
 const shutdownTimeout = 5 * time.Second
 
-func Serve(ctx context.Context, wg *sync.WaitGroup, w *world.World, addr string) error {
+func Serve(ctx context.Context, wg *sync.WaitGroup, w *world.World, hub *Hub, addr string) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/state", func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
@@ -25,6 +25,7 @@ func Serve(ctx context.Context, wg *sync.WaitGroup, w *world.World, addr string)
 			log.Printf("encode snapshot: %v", err)
 		}
 	})
+	mux.HandleFunc("GET /ws", hub.ServeWS)
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {

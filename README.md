@@ -61,6 +61,11 @@ go run ./cmd/gateway
 curl -s localhost:8080/api/state | jq
 ```
 
+`GET /ws` streams the same shape over a WebSocket: one snapshot immediately on
+connect, then another whenever the world changes. Updates are coalesced onto a
+100ms tick, so a burst of events costs one frame rather than one per message, and
+a browser that stops reading is dropped instead of stalling the broadcaster.
+
 Players heartbeat their whole army every few seconds, so the gateway can be
 restarted at any point and refills within one interval. A player who stops
 heartbeating is dropped after `PLAYER_TTL_SECONDS`.
