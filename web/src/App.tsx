@@ -6,16 +6,8 @@ import { WarLog } from "./WarLog";
 import { WorldMap } from "./WorldMap";
 
 function App() {
-  const { snapshot, connected } = useWorld();
-
-  if (snapshot === null) {
-    return <p>Waiting for the gateway...</p>;
-  }
-
-  const colors = playerColors(
-    snapshot.players.map((p) => p.username),
-    false,
-  );
+  const { snapshot, slots, connected } = useWorld();
+  const colors = playerColors(slots, false);
 
   return (
     <div className="app">
@@ -25,14 +17,20 @@ function App() {
           {connected ? "live" : "reconnecting…"}
         </span>
       </header>
-      <main>
-        <WorldMap locations={snapshot.locations} colors={colors} />
-        <aside>
-          <h2>Players</h2>
-          <PlayerList players={snapshot.players} colors={colors} />
-          <h2>War log</h2>
-          <WarLog log={snapshot.log} />
-        </aside>
+      <main className={connected ? undefined : "stale"}>
+        {snapshot === null ? (
+          <p className="empty waiting">Connecting to the gateway…</p>
+        ) : (
+          <>
+            <WorldMap locations={snapshot.locations} colors={colors} />
+            <aside>
+              <h2>Players</h2>
+              <PlayerList players={snapshot.players} colors={colors} />
+              <h2>War log</h2>
+              <WarLog log={snapshot.log} />
+            </aside>
+          </>
+        )}
       </main>
     </div>
   );

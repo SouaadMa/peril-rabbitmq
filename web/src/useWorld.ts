@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import { assignSlots } from "./colors";
 import type { Snapshot } from "./types";
 
+type WorldState = {
+  snapshot: Snapshot | null;
+  slots: Map<string, number>;
+};
+
 export function useWorld() {
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [world, setWorld] = useState<WorldState>({
+    snapshot: null,
+    slots: new Map(),
+  });
+
   const [connected, setConnected] = useState(false);
   const retry = useRef(0);
 
@@ -20,7 +30,17 @@ export function useWorld() {
         retry.current = 0;
         setConnected(true);
       };
-      socket.onmessage = (event) => setSnapshot(JSON.parse(event.data));
+      socket.onmessage = (event) => {
+        const snapshot: Snapshot = JSON.parse(event.data);
+        setWorld((previous) => ({
+          snapshot,
+          slots: assignSlots(
+            previous.slots,
+            snapshot.players.map((player) => player.username),
+          ),
+        }));
+      };
+
       socket.onerror = () => socket?.close();
       socket.onclose = () => {
         setConnected(false);
@@ -39,5 +59,5 @@ export function useWorld() {
     };
   }, []);
 
-  return { snapshot, connected };
+  return { snapshot: world.snapshot, slots: world.slots, connected };
 }
