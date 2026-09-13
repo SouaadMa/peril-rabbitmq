@@ -6,6 +6,11 @@ client keeps its own army, publishes its moves, and reacts to everyone else's.
 A gateway watches the whole thing and streams it to a live world map in the
 browser.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/peril-dark.gif">
+  <img alt="Two players fighting over the world map" src="docs/peril.gif">
+</picture>
+
 I built this to get properly comfortable with AMQP: exchanges, routing keys,
 acknowledgements, prefetch, and dead-lettering — and then to try some frontend :D
 

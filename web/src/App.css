@@ -59,11 +59,41 @@ body {
     stroke-width: 3px;
     stroke-linejoin: round;
 }
+.map-wrap {
+    position: relative;
+}
+.tooltip {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    pointer-events: none;
+    background: var(--surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    transform: translate(12px, 12px);
+}
+.tooltip {
+    min-width: 180px;
+}
+.tooltip-title {
+    display: block;
+    margin-bottom: 4px;
+    text-transform: capitalize;
+}
+
 .region text {
     stroke: var(--surface);
 }
 .region.filled text {
     stroke: rgba(11, 11, 11, 0.45);
+}
+.region.hovered path {
+    stroke: var(--text-primary);
+    stroke-width: 2;
 }
 
 .region path {
