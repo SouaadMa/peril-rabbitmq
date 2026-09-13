@@ -47,9 +47,7 @@ export function WorldMap({ locations, colors }: Props) {
           }
         }
 
-        const fill = leader
-          ? (colors.get(leader.username) ?? "#6b6a66")
-          : "#e2e1dc";
+        const fill = leader ? colors.get(leader.username) : undefined;
 
         const lines = 1 + location.occupants.length;
         const firstLine = labelY - ((lines - 1) * LINE_HEIGHT) / 2 + 5;
@@ -61,8 +59,7 @@ export function WorldMap({ locations, colors }: Props) {
           >
             <path
               d={shape.path}
-              fill={fill}
-              stroke="#fcfcfb"
+              style={leader ? { fill } : undefined}
               strokeWidth={1}
               strokeLinejoin="round"
             />

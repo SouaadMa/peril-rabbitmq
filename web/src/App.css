@@ -1,7 +1,57 @@
+:root {
+    color-scheme: light dark;
+
+    --surface: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #8a8984;
+    --border: #e7e6e2;
+
+    --ocean: #eef2f5;
+    --graticule: #d7dee4;
+    --land-empty: #e2e1dc;
+
+    --series-0: #2a78d6;
+    --series-1: #eb6834;
+    --series-2: #1baf7a;
+    --overflow: #6b6a66;
+
+    --status-good: #1baf7a;
+    --status-warn: #eb6834;
+}
+@media (prefers-color-scheme: dark) {
+    :root {
+        --surface: #1a1a19;
+        --text-primary: #ffffff;
+        --text-secondary: #c3c2b7;
+        --text-muted: #9a9990;
+        --border: #2f2f2d;
+
+        --ocean: #20262b;
+        --graticule: #2c343a;
+        --land-empty: #3a3a37;
+
+        --series-0: #3987e5;
+        --series-1: #d95926;
+        --series-2: #199e70;
+        --overflow: #8a8984;
+
+        --status-good: #199e70;
+        --status-warn: #d95926;
+    }
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    color: var(--text-primary);
+    background: var(--surface);
+}
+
 .map {
     width: 100%;
     height: auto;
-    background: #eef2f5;
+    background: var(--ocean);
     border-radius: 12px;
 }
 .map text {
@@ -10,10 +60,21 @@
     stroke-linejoin: round;
 }
 .region text {
-    stroke: #fcfcfb;
+    stroke: var(--surface);
 }
 .region.filled text {
     stroke: rgba(11, 11, 11, 0.45);
+}
+
+.region path {
+    fill: var(--land-empty);
+    stroke: var(--surface);
+}
+.region text {
+    fill: var(--text-secondary);
+}
+.region.filled text {
+    fill: #ffffff;
 }
 
 .region-name {
@@ -27,7 +88,7 @@
 body {
     margin: 0;
     font-family: system-ui, sans-serif;
-    color: #0b0b0b;
+    color: var(--text-primary);
 }
 .app {
     max-width: 1200px;
@@ -57,17 +118,17 @@ main {
     border: 1px solid currentColor;
 }
 .pill.live {
-    color: #1baf7a;
+    color: var(--status-good);
 }
 .pill.down {
-    color: #eb6834;
+    color: var(--status-warn);
 }
 
 aside h2 {
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #52514e;
+    color: var(--text-secondary);
     margin: 16px 0 8px;
 }
 .players,
@@ -90,7 +151,7 @@ aside h2 {
 }
 .count {
     margin-left: auto;
-    color: #52514e;
+    color: var(--text-secondary);
     font-size: 12px;
 }
 .log li {
@@ -98,19 +159,19 @@ aside h2 {
     gap: 8px;
     padding: 3px 0;
     font-size: 13px;
-    border-bottom: 1px solid #e7e6e2;
+    border-bottom: 1px solid var(--border);
 }
 .log time {
-    color: #8a8984;
+    color: var(--text-muted);
     flex-shrink: 0;
     font-variant-numeric: tabular-nums;
 }
 .empty {
-    color: #8a8984;
+    color: var(--text-muted);
     font-size: 14px;
 }
 .graticule line {
-    stroke: #d7dee4;
+    stroke: var(--graticule);
     stroke-width: 0.6;
 }
 .waiting {

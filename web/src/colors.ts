@@ -1,7 +1,5 @@
-const SERIES_LIGHT = ["#2a78d6", "#eb6834", "#1baf7a"];
-const SERIES_DARK = ["#3987e5", "#d95926", "#199e70"];
-const OVERFLOW_LIGHT = "#6b6a66";
-const OVERFLOW_DARK = "#8a8984";
+const SERIES = ["var(--series-0)", "var(--series-1)", "var(--series-2)"];
+const OVERFLOW = "var(--overflow)";
 
 export function assignSlots(
   previous: Map<string, number>,
@@ -26,12 +24,10 @@ export function assignSlots(
   return next;
 }
 
-export function playerColors(slots: Map<string, number>, dark: boolean) {
-  const series = dark ? SERIES_DARK : SERIES_LIGHT;
-  const overflow = dark ? OVERFLOW_DARK : OVERFLOW_LIGHT;
+export function playerColors(slots: Map<string, number>) {
   const colors = new Map<string, string>();
   for (const [name, slot] of slots) {
-    colors.set(name, series[slot] ?? overflow);
+    colors.set(name, SERIES[slot] ?? OVERFLOW);
   }
   return colors;
 }

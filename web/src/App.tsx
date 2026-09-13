@@ -7,7 +7,7 @@ import { WorldMap } from "./WorldMap";
 
 function App() {
   const { snapshot, slots, connected } = useWorld();
-  const colors = playerColors(slots, false);
+  const colors = playerColors(slots);
 
   return (
     <div className="app">
